@@ -21,20 +21,15 @@ import com.aaa.lib.map.imp.layer.YXPathLayer;
 import com.aaa.lib.map.imp.layer.YXPointAroundAreaLayer;
 import com.aaa.lib.map.imp.layer.YXPowerLayer;
 import com.aaa.lib.map.imp.layer.YXRoomTagLayer;
+import com.aaa.lib.map.imp.model.AreaBean;
 import com.aaa.lib.map.imp.model.LDAreaBean;
 import com.aaa.lib.map.imp.model.LDMapBean;
 import com.aaa.lib.map.imp.model.LDPathBean;
+import com.aaa.lib.map.imp.model.Robot;
+import com.aaa.lib.map.imp.parser.ParseResult;
+import com.aaa.lib.map.imp.parser.PathParseResult;
+import com.aaa.lib.map.layer.BaseLayer;
 import com.aaa.lib.map.layer.MapLayer;
-import com.aaa.lib.map.layer.YXAreaDivideLineLayer;
-import com.aaa.lib.map.layer.YXCleanAreaLayer;
-import com.aaa.lib.map.layer.YXForbiddenAreaLayer;
-import com.aaa.lib.map.layer.YXForbiddenLineLayer;
-import com.aaa.lib.map.layer.YXForbiddenMopAreaLayer;
-import com.aaa.lib.map.layer.YXImageMarkerLayer;
-import com.aaa.lib.map.layer.YXPathLayer;
-import com.aaa.lib.map.layer.YXPointAroundAreaLayer;
-import com.aaa.lib.map.layer.YXPowerLayer;
-import com.aaa.lib.map.layer.YXRoomTagLayer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -121,7 +116,7 @@ public class YXMapView extends MapView<YXLayerManager> {
         mLayerManager.addLayer(powerLayer);
 
         //添加扫地机
-        Bitmap sweeperBitmap = BitmapFactory.decodeResource(getResources(), com.aaa.lib.map.R.mipmap.robot_inmap);
+        Bitmap sweeperBitmap = BitmapFactory.decodeResource(getResources(), R.mipmap.robot_inmap);
         deviceLayer = new YXImageMarkerLayer(this, sweeperBitmap);
         deviceLayer.setMarker(YXCoordinateConverter.devicePosX, YXCoordinateConverter.devicePosY, 0);
         mLayerManager.addLayer(deviceLayer);

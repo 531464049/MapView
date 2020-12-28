@@ -5,19 +5,16 @@ import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
 
+import com.aaa.lib.map.imp.model.AreaBean;
 import com.aaa.lib.map.imp.model.LDMapBean;
 import com.aaa.lib.map.imp.model.LDPathBean;
-import com.yx.lz.Robot;
-import com.yx.lz.bean.AreaBean;
-import com.yx.lz.bean.LDMapBean;
-import com.yx.lz.bean.LDPathBean;
-import com.yx.lz.connector.TuyaConnector;
-import com.yx.lz.mapping.parser.ParseResult;
-import com.yx.lz.mapping.parser.PathParseResult;
+import com.aaa.lib.map.imp.model.Robot;
+import com.aaa.lib.map.imp.parser.ParseResult;
+import com.aaa.lib.map.imp.parser.PathParseResult;
 
 import java.lang.ref.SoftReference;
 import java.util.ArrayList;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
@@ -71,12 +68,12 @@ public class YXMapViewRefreshHelper {
             }
             if (msg.what == MSG_REFRESH_PATH) {
                 if (mainActivitySoftReference.get() != null) {
-                    mainActivitySoftReference.get().updatePath(new ParseResult<>(ParseResult.MSG_PARSE_SUCCESS));
+                    mainActivitySoftReference.get().updatePath(new ParseResult<PathParseResult>(ParseResult.MSG_PARSE_SUCCESS));
                 }
             }
             if (msg.what == MSG_REQUEST_MAP) {
                 if (mainActivitySoftReference.get() != null) {
-                    TuyaConnector.requestMapData();
+//                    TuyaConnector.requestMapData();
                 }
             }
         }
@@ -112,7 +109,7 @@ public class YXMapViewRefreshHelper {
             drawPath = false;
         } else if (parseResult.getCode() == ParseResult.MSG_PARSE_FAIL_DATA_NOT_MATCH) {
             //虽然缺少了数据 但是还是继续渲染， 缺的再去请求
-            TuyaConnector.requestPathData(parseResult.getResult().getPosFrom(), parseResult.getResult().getPosTo());
+//            TuyaConnector.requestPathData(parseResult.getResult().getPosFrom(), parseResult.getResult().getPosTo());
             drawPath = true;
             pathDataUpdate.signal();
         } else {
@@ -139,7 +136,7 @@ public class YXMapViewRefreshHelper {
 
     public void open() {
         //初始化线程和锁
-        threadPoolExecutor = new ThreadPoolExecutor(3, 3, 1, TimeUnit.SECONDS, new LinkedBlockingDeque<>(50));
+        threadPoolExecutor = new ThreadPoolExecutor(3, 3, 1, TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(10));
         refreshMapLock = new ReentrantLock();
         mapDataUpdate = refreshMapLock.newCondition();
         refreshPathLock = new ReentrantLock();
@@ -159,7 +156,7 @@ public class YXMapViewRefreshHelper {
     public void close() {
         refreshMap = false;
         updateMap(new ParseResult<>(ParseResult.MSG_PARSE_SUCCESS));
-        updatePath(new ParseResult<>(ParseResult.MSG_PARSE_SUCCESS));
+        updatePath(new ParseResult<PathParseResult>(ParseResult.MSG_PARSE_SUCCESS));
         updateArea(new ParseResult<>(ParseResult.MSG_PARSE_SUCCESS));
     }
 
@@ -265,7 +262,7 @@ public class YXMapViewRefreshHelper {
     };
 
     private void requestPath() {
-        TuyaConnector.requestPathInfo();
+//        TuyaConnector.requestPathInfo();
         handler.removeMessages(MSG_REQUEST_PATH);
         handler.sendEmptyMessageDelayed(MSG_REQUEST_PATH, 2000);
     }

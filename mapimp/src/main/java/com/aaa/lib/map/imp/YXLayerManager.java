@@ -1,5 +1,7 @@
 package com.aaa.lib.map.imp;
 
+import android.util.Log;
+
 import com.aaa.lib.map.LayerManager;
 import com.aaa.lib.map.MapUtils;
 import com.aaa.lib.map.MapView;
@@ -17,23 +19,16 @@ import java.util.List;
 public class YXLayerManager extends LayerManager {
     private static final String TAG = "YXLayerManager";
 
-    private boolean isLayerListChanged = false;
 
     public YXLayerManager(MapView mapView) {
         super(mapView);
-        setLayerListChangeListener(new LayerListChangeListener() {
-            @Override
-            public void onLayerAdd(BaseLayer layer) {
-                isLayerListChanged = true;
-            }
-
-            @Override
-            public void onLayerRemove(BaseLayer layer) {
-                isLayerListChanged = true;
-            }
-        });
     }
 
+    /**
+     * 重新设置所有区域图层
+     *
+     * @param yxAreaLayers
+     */
     public void setAreaLayer(List<YXAreaLayer> yxAreaLayers) {
         //移除所有区域图层
         Iterator<BaseLayer> it = mLayerList.iterator();
@@ -46,6 +41,12 @@ public class YXLayerManager extends LayerManager {
         mLayerList.addAll(yxAreaLayers);
     }
 
+    /**
+     * 通过ID判断是否存在
+     *
+     * @param areaBean
+     * @return
+     */
     public YXAreaLayer isAreaLayerExist(AreaBean areaBean) {
         for (BaseLayer layer : mLayerList) {
             if (layer instanceof YXAreaLayer && ((YXAreaLayer) layer).getAreaInfo().getAreaID() == areaBean.getAreaID()) {
@@ -55,6 +56,11 @@ public class YXLayerManager extends LayerManager {
         return null;
     }
 
+    /**
+     * 获取选择的区域图层
+     *
+     * @return
+     */
     public List<BaseLayer> getSelectedArea() {
         List<BaseLayer> layers = new ArrayList<>();
         for (BaseLayer layer : mLayerList) {
@@ -69,6 +75,12 @@ public class YXLayerManager extends LayerManager {
         return layers;
     }
 
+    /**
+     * 获取勾选的指定类型的区域图层
+     *
+     * @param cls
+     * @return
+     */
     public List<BaseLayer> getSelectedAreaByType(Class cls) {
         List<BaseLayer> layers = new ArrayList<>();
         for (BaseLayer layer : mLayerList) {
@@ -83,6 +95,11 @@ public class YXLayerManager extends LayerManager {
         return layers;
     }
 
+    /**
+     * 获取所有图层
+     *
+     * @return
+     */
     public List<YXAreaLayer> getAllArea() {
         List<YXAreaLayer> layers = new ArrayList<>();
         for (BaseLayer layer : mLayerList) {
@@ -93,6 +110,12 @@ public class YXLayerManager extends LayerManager {
         return layers;
     }
 
+    /**
+     * 获取指定类型的图层
+     *
+     * @param cls
+     * @return
+     */
     public List<BaseLayer> getLayerByType(Class cls) {
         List<BaseLayer> layers = new ArrayList<>();
         for (BaseLayer layer : mLayerList) {
@@ -103,7 +126,13 @@ public class YXLayerManager extends LayerManager {
         return layers;
     }
 
-    public boolean isPowerInLayer(YXPowerLayer powerLayer) {
+    /**
+     * 判断禁区是否与电源保护区域相交
+     *
+     * @param powerLayer
+     * @return
+     */
+    public boolean isPowerCrossForbidArea(YXPowerLayer powerLayer) {
         for (BaseLayer layer : mLayerList) {
             //判断禁区是否与电源保护区域相交
             if (layer instanceof YXForbiddenAreaLayer) {
@@ -122,19 +151,22 @@ public class YXLayerManager extends LayerManager {
         return false;
     }
 
+    /**
+     * 判断禁区是否改变
+     *
+     * @return
+     */
     public boolean isForbiddenAreaChange() {
-        if (isLayerListChanged) {
-            return true;
-        }
-
         for (BaseLayer layer : mLayerList) {
             if (layer instanceof YXForbiddenAreaLayer) {
                 if (((YXForbiddenAreaLayer) layer).isChanged()) {
+                    Log.i(TAG,"isForbiddenAreaChange Area");
                     return true;
                 }
             }
             if (layer instanceof YXForbiddenLineLayer) {
                 if (((YXForbiddenLineLayer) layer).isChanged()) {
+                    Log.i(TAG,"isForbiddenAreaChange Line");
                     return true;
                 }
             }
@@ -143,3 +175,4 @@ public class YXLayerManager extends LayerManager {
     }
 
 }
+

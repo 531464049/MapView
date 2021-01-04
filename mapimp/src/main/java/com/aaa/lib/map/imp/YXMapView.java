@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory;
 import android.graphics.PointF;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.view.ViewTreeObserver;
 
 import com.aaa.lib.map.MapView;
 import com.aaa.lib.map.MatrixUtil;
@@ -25,9 +24,6 @@ import com.aaa.lib.map.imp.model.AreaBean;
 import com.aaa.lib.map.imp.model.LDAreaBean;
 import com.aaa.lib.map.imp.model.LDMapBean;
 import com.aaa.lib.map.imp.model.LDPathBean;
-import com.aaa.lib.map.imp.model.Robot;
-import com.aaa.lib.map.imp.parser.ParseResult;
-import com.aaa.lib.map.imp.parser.PathParseResult;
 import com.aaa.lib.map.layer.BaseLayer;
 import com.aaa.lib.map.layer.MapLayer;
 
@@ -50,9 +46,7 @@ public class YXMapView extends MapView<YXLayerManager> {
     private List<YXRoomTagLayer> roomTagLayers;
     private List<YXPointAroundAreaLayer> locationLayers;
     private volatile YXAreaDivideLineLayer areaDivideLineLayer;
-
-    private YXMapViewRefreshHelper refreshHelper;
-
+    private boolean hasLoadMap = false;
 
     public YXMapView(Context context) {
         this(context, null);
@@ -65,86 +59,118 @@ public class YXMapView extends MapView<YXLayerManager> {
     public YXMapView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         mLayerManager = new YXLayerManager(this);
-        refreshHelper = new YXMapViewRefreshHelper(this);
-        Log.i(TAG, "YXMapView init");
-        getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-            @Override
-            public void onGlobalLayout() {
-                float width = (float) getWidth();
-                float height = (float) getHeight();
-                Log.i(TAG, "YXMapView onGlobalLayout " + width + " height : " + height);
-                if (width != 0 && height != 0) {
-                    refreshMap(Robot.get().getMapData(), Robot.get().getPathData());
-                }
-            }
-        });
-        initLayer();
-    }
-
-
-    @Override
-    protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        refreshHelper.open();
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        refreshHelper.close();
-    }
-
-    private void initLayer() {
-        //初始化mapview  添加layer
-        LDMapBean ldMapBean = Robot.get().getMapData();
-        LDPathBean ldPathBean = Robot.get().getPathData();
-        LDAreaBean ldAreaBean = Robot.get().getAreaData();
-
-        //添加地图
-        mapLayer = new MapLayer(this);
-        mLayerManager.addLayer(mapLayer);
-        refreshMap(ldMapBean, ldPathBean);
-
-        //添加路径
-        pathLayer = new YXPathLayer(this);
-        mLayerManager.addLayer(pathLayer);
-        refreshPath(ldMapBean, ldPathBean);
-
-        //添加电源图层
-        powerLayer = new YXPowerLayer(this);
-        powerLayer.initPowerLayer((float) ldMapBean.dockerPosX, (float) ldMapBean.dockerPosY, 0.5f, 0);
-        mLayerManager.addLayer(powerLayer);
-
-        //添加扫地机
-        Bitmap sweeperBitmap = BitmapFactory.decodeResource(getResources(), R.mipmap.robot_inmap);
-        deviceLayer = new YXImageMarkerLayer(this, sweeperBitmap);
-        deviceLayer.setMarker(YXCoordinateConverter.devicePosX, YXCoordinateConverter.devicePosY, 0);
-        mLayerManager.addLayer(deviceLayer);
-
-        //设置区域信息
         initAllArea();
-        refreshArea(ldAreaBean.getAreaList());
+        Log.i(TAG, "YXMapView init");
     }
 
-    public void refreshMap(LDMapBean ldMapBean, LDPathBean ldPathBean) {
+    @Override
+    public void onWindowFocusChanged(boolean hasWindowFocus) {
+        super.onWindowFocusChanged(hasWindowFocus);
+        if (hasWindowFocus) {
+            if (!hasLoadMap && mapLayer != null && mapLayer.getMapBitmap() != null) {
+                hasLoadMap = MatrixUtil.loadMapOffsetAndScale(mapLayer.getMapBitmap(), this);
+                refresh();
+            }
+        }
+    }
+
+    public void initLayer(LDMapBean ldMapBean, LDPathBean ldPathBean, LDAreaBean ldAreaBean) {
+        refreshMapAndPower(ldMapBean, ldPathBean);
+        refreshPathAndDevice(ldMapBean, ldPathBean);
+        refreshAreaLayer(ldAreaBean);
+    }
+
+    public void refreshMapAndPower(LDMapBean ldMapBean, LDPathBean ldPathBean) {
+        //刷新地图
+        refreshMapLayer(ldMapBean, ldPathBean);
+        //刷新充电桩
+        if (ldMapBean.dockerPosX != 0 && ldMapBean.dockerPosY != 0) {
+            refreshPowerLayer(YXCoordinateConverter.getScreenPointFromOrigin(ldMapBean.dockerPosX, ldMapBean.dockerPosY), 0);
+        }
+
+        refresh();
+    }
+
+    public void refreshPathAndDevice(LDMapBean ldMapBean, LDPathBean ldPathBean) {
+        //刷新路径
+        refreshPathLayer(ldMapBean, ldPathBean);
+        Log.i(TAG, "device x " + YXCoordinateConverter.devicePosX + " y " + YXCoordinateConverter.devicePosY);
+        //刷新设备图标
+        if (YXCoordinateConverter.devicePosX != 0 && YXCoordinateConverter.devicePosY != 0) {
+            refreshDeviceLayer(new PointF(YXCoordinateConverter.devicePosX, YXCoordinateConverter.devicePosY), 0);
+        }
+        refresh();
+    }
+
+    float[] matrixValue = new float[9];
+
+    public void translate(float distanceX, float distanceY) {
+        //限制滑动范围
+        if (mapLayer != null && mapLayer.getMapBitmap() != null) {
+            float bitmapWidth = mapLayer.getMapBitmap().getWidth();
+            float bitmapHeight = mapLayer.getMapBitmap().getHeight();
+            float mapWidth = getWidth();
+            float mapHeight = getHeight();
+            if (bitmapWidth != 0 && bitmapHeight != 0) {
+                mMatrix.getValues(matrixValue);
+
+                if (matrixValue[2] - distanceX < -bitmapWidth * matrixValue[0]) {
+                    matrixValue[2] = -bitmapWidth * matrixValue[0];
+                } else if (matrixValue[2] - distanceX > mapWidth) {
+                    matrixValue[2] = mapWidth;
+                } else {
+                    matrixValue[2] = matrixValue[2] - distanceX;
+                }
+
+                if (matrixValue[5] - distanceY < -bitmapHeight * matrixValue[0]) {
+                    matrixValue[5] = -bitmapHeight * matrixValue[0];
+                } else if (matrixValue[5] - distanceY > mapHeight) {
+                    matrixValue[5] = mapHeight;
+                } else {
+                    matrixValue[5] = matrixValue[5] - distanceY;
+                }
+
+                mMatrix.setValues(matrixValue);
+                refresh();
+            } else {
+                super.translate(distanceX, distanceY);
+            }
+        } else {
+            super.translate(distanceX, distanceY);
+        }
+    }
+
+
+    private void refreshMapLayer(LDMapBean ldMapBean, LDPathBean ldPathBean) {
+        if (mapLayer == null) {
+            //添加地图
+            mapLayer = new MapLayer(this);
+            mLayerManager.addLayer(mapLayer);
+        }
         Bitmap mapBitmap = Render.renderMap(ldMapBean, ldPathBean);
-        MatrixUtil.loadMap(mapBitmap, this);
+        if (!hasLoadMap) {
+            hasLoadMap = MatrixUtil.loadMapOffsetAndScale(mapBitmap, this);
+        }
+
         mapLayer.setMapBitmap(mapBitmap);
-        refresh();
     }
 
-    public void refreshPath(LDMapBean ldMapBean, LDPathBean ldPathBean) {
+    public void refreshPathLayer(LDMapBean ldMapBean, LDPathBean ldPathBean) {
+        if (pathLayer == null) {
+            //添加路径
+            pathLayer = new YXPathLayer(this);
+            mLayerManager.addLayer(pathLayer);
+        }
+
         Bitmap pathBitmap = Render.renderPath(ldMapBean, ldPathBean);
-        this.pathLayer.setPathBitmap(pathBitmap);
-        refresh();
+        pathLayer.setPathBitmap(pathBitmap);
     }
 
-    public void refreshArea(List<AreaBean> areaList) {
+    public void refreshAreaLayer(LDAreaBean ldAreaBean) {
         //移除所有区域图层
         clearAllArea();
-        Log.i(TAG, areaList.toString());
         List<YXAreaLayer> newAreaLayerList = new ArrayList<>();
-        for (AreaBean areaBean : areaList) {
+        for (AreaBean areaBean : ldAreaBean.getAreaList()) {
 //            YXAreaLayer layer = isLayerExist(areaBean);  判断图层是否存在 如果图层不存在就新建
             if (areaBean.getType() == YXAreaLayer.TYPE_CLEAN_AREA) {
                 YXCleanAreaLayer layer = new YXCleanAreaLayer(this);
@@ -187,9 +213,18 @@ public class YXMapView extends MapView<YXLayerManager> {
     }
 
 
-    public void refreshSweeper(PointF position, float direction) {
-        this.deviceLayer.setMarker(position, direction);
-        refresh();
+    private void refreshDeviceLayer(PointF position, float direction) {
+        refreshDeviceLayer(position.x, position.y, direction);
+    }
+
+    private void refreshDeviceLayer(float centerX, float centerY, float direction) {
+        if (deviceLayer == null) {
+            //添加扫地机
+            Bitmap sweeperBitmap = BitmapFactory.decodeResource(getResources(), R.mipmap.robot_inmap);
+            deviceLayer = new YXImageMarkerLayer(this, sweeperBitmap);
+            mLayerManager.addLayer(deviceLayer);
+        }
+        deviceLayer.setMarker(centerX, centerY, direction);
     }
 
     /**
@@ -198,14 +233,20 @@ public class YXMapView extends MapView<YXLayerManager> {
      * @param position  电源位置
      * @param direction 电源朝向
      */
-    public void refreshPower(PointF position, float direction) {
-        refreshPower(position.x, position.y, direction);
+    private void refreshPowerLayer(PointF position, float direction) {
+        refreshPowerLayer(position.x, position.y, direction);
     }
 
-    public void refreshPower(float centerX, float centerY, float rotation) {
+    private void refreshPowerLayer(float centerX, float centerY, float rotation) {
+        Log.i(TAG, "refreshPowerLayer : " + centerX + " , " + centerY);
+        if (powerLayer == null) {
+            //添加电源图层
+            powerLayer = new YXPowerLayer(this);
+            powerLayer.setRadius(0.5f);
+            mLayerManager.addLayer(powerLayer);
+        }
         powerLayer.setCenter(centerX, centerY);
         powerLayer.setRotation(rotation);
-        refresh();
     }
 
     /**
@@ -213,10 +254,11 @@ public class YXMapView extends MapView<YXLayerManager> {
      * 限制只能添加一个
      */
     public void addAreaDivideLineLayer() {
-        if (areaDivideLineLayer != null) {
+        if (areaDivideLineLayer == null) {
             areaDivideLineLayer = new YXAreaDivideLineLayer(this);
             areaDivideLineLayer.setLine(new PointF(200, getHeight() / 2), new PointF(getWidth() / 2, getHeight() / 2));
             mLayerManager.addLayer(areaDivideLineLayer);
+            refresh();
         }
     }
 
@@ -226,6 +268,7 @@ public class YXMapView extends MapView<YXLayerManager> {
     public void removeAreaDivideLineLayer() {
         mLayerManager.removeLayer(areaDivideLineLayer);
         areaDivideLineLayer = null;
+        refresh();
     }
 
     /**
@@ -249,6 +292,7 @@ public class YXMapView extends MapView<YXLayerManager> {
                 areaLayer.setEditMode(editable);
             }
         }
+        refresh();
     }
 
     /**
@@ -262,6 +306,7 @@ public class YXMapView extends MapView<YXLayerManager> {
                 areaLayer.setEditMode(editable);
             }
         }
+        refresh();
     }
 
     /**
@@ -273,6 +318,7 @@ public class YXMapView extends MapView<YXLayerManager> {
         for (BaseLayer areaLayer : cleanAreaLayers) {
             ((YXCleanAreaLayer) areaLayer).setEditMode(editable);
         }
+        refresh();
     }
 
     /**
@@ -281,20 +327,14 @@ public class YXMapView extends MapView<YXLayerManager> {
      * @param show 显示/不显示
      */
     public void showPowerProtectArea(boolean show) {
-        powerLayer.setShowProtectArea(show);
-    }
-
-    public void updateMap(ParseResult result) {
-        //解析地图数据
-        refreshHelper.updateMap(result);
-    }
-
-    public void updatePath(ParseResult<PathParseResult> parseResult) {
-        refreshHelper.updatePath(parseResult);
-    }
-
-    public void updateArea(ParseResult parseResult) {
-        refreshHelper.updateArea(parseResult);
+        if (powerLayer == null) {
+            //添加电源图层
+            powerLayer = new YXPowerLayer(this);
+            powerLayer.setRadius(0.5f);
+            mLayerManager.addLayer(powerLayer);
+            powerLayer.setShowProtectArea(show);
+            refresh();
+        }
     }
 
 
@@ -346,8 +386,8 @@ public class YXMapView extends MapView<YXLayerManager> {
         } else if (layer instanceof YXCleanAreaLayer) {
             cleanAreaLayers.add((YXCleanAreaLayer) layer);
         }
-
         mLayerManager.addLayer(layer);
+        refresh();
     }
 
 
@@ -382,8 +422,8 @@ public class YXMapView extends MapView<YXLayerManager> {
         return false;
     }
 
-    public boolean isPowerInLayer() {
-        return mLayerManager.isPowerInLayer(powerLayer);
+    public boolean isPowerCrossForbidArea() {
+        return mLayerManager.isPowerCrossForbidArea(powerLayer);
     }
 
     public YXPowerLayer getPowerLayer() {

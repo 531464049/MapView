@@ -12,14 +12,14 @@ public class MatrixUtil {
     private static float[] sMatrixValue = new float[9];
     private static float[] sPoint = new float[2];
 
-    public static synchronized void loadMap(Bitmap bitmap, MapView mMapView) {
-
+    public static synchronized boolean loadMapOffsetAndScale(Bitmap bitmap, MapView mMapView) {
+        Log.i(TAG, "loadMapOffsetAndScale start: ");
         if (bitmap == null || bitmap.isRecycled() || bitmap.getWidth() == 0 || bitmap.getHeight() == 0) {
-            return;
+            return false;
         }
 
         if (mMapView.getWidth() == 0 || mMapView.getHeight() == 0) {
-            return;
+            return false;
         }
         mMapView.getTransform().reset();
 
@@ -34,6 +34,7 @@ public class MatrixUtil {
         Log.i(TAG, "map offset x  : " + offsetX + " y " + offsetY);
 
         mMapView.getTransform().postTranslate(offsetX / 2, offsetY / 2);
+        return true;
     }
 
     private static float calculateScaleFactor(int bitmapWidth, int bitmapHeight, int viewWidth, int viewHeight) {
@@ -60,9 +61,9 @@ public class MatrixUtil {
     /**
      * 缩放
      *
-     * @param scale 缩放比例
-     * @param x     缩放中心点x
-     * @param y     缩放中心点y
+     * @param scale   缩放比例
+     * @param centerX 缩放中心点x
+     * @param centerY 缩放中心点y
      */
     public static synchronized void scale(float scale, float centerX, float centerY, Matrix matrix) {
         float currentZoom = getCurrentZoom(matrix);
@@ -87,3 +88,4 @@ public class MatrixUtil {
         return sMatrixValue[Matrix.MSCALE_X];
     }
 }
+

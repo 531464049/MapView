@@ -10,7 +10,6 @@ import android.view.SurfaceView;
 
 import com.aaa.lib.map.layer.BaseLayer;
 
-
 public class MapView<T extends LayerManager> extends SurfaceView implements SurfaceHolder.Callback {
 
     private static final String TAG = MapView.class.getSimpleName();
@@ -18,9 +17,10 @@ public class MapView<T extends LayerManager> extends SurfaceView implements Surf
     private SurfaceHolder mHolder;
     private TouchHandler mTouchHandler;
     private DrawHelper mDrawHelper;
-    private Matrix mMatrix;
-    private int bgColor;
+    protected Matrix mMatrix;
     protected T mLayerManager;
+    private boolean canTouch = true;
+    private int bgColor;
 
     public MapView(Context context) {
         this(context, null);
@@ -35,10 +35,6 @@ public class MapView<T extends LayerManager> extends SurfaceView implements Surf
         init();
     }
 
-    public void setBackgroundColor(int color) {
-        bgColor = color;
-    }
-
     private void init() {
         getHolder().addCallback(this);
         mMatrix = new Matrix();
@@ -47,6 +43,7 @@ public class MapView<T extends LayerManager> extends SurfaceView implements Surf
     }
 
     public void refresh() {
+        //TODO 当前只能刷新所有图层 需要做局部刷新优化
         Log.i(TAG, "refresh");
         if (mDrawHelper != null) {
             mDrawHelper.refresh();
@@ -61,6 +58,15 @@ public class MapView<T extends LayerManager> extends SurfaceView implements Surf
                 mDrawHelper.refresh();
             }
         }
+    }
+
+    public void translate(float x, float y) {
+        mMatrix.postTranslate(x, y);
+        refresh();
+    }
+
+    public void setBackgroundColor(int color) {
+        bgColor = color;
     }
 
     @Override
@@ -85,9 +91,16 @@ public class MapView<T extends LayerManager> extends SurfaceView implements Surf
      */
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        //判断是否可以操作
+        if (!canTouch) {
+            return true;
+        }
+
+        //判断是子图层是否处理事件
         if (mLayerManager.dispatchToLayers(event)) {
             return true;
         }
+        //子图层未处理，自己处理 做平移缩放操作
         return mTouchHandler.onTouchEvent(event);
     }
 
@@ -118,6 +131,10 @@ public class MapView<T extends LayerManager> extends SurfaceView implements Surf
         Log.i(TAG, "surfaceDestroyed");
         mHolder = null;
         mDrawHelper.release();
+    }
+
+    public void setCanTouch(boolean canTouch) {
+        this.canTouch = canTouch;
     }
 
     public Matrix getTransform() {

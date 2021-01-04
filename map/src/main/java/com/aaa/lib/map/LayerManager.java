@@ -61,8 +61,6 @@ public class LayerManager {
         if (layerListChangeListener != null) {
             layerListChangeListener.onLayerAdd(layer);
         }
-
-        mMapView.refresh();
     }
 
     /**
@@ -85,8 +83,6 @@ public class LayerManager {
         }
 
         Collections.sort(mLayerList, mComparator);
-
-        mMapView.refresh();
     }
 
     /**
@@ -102,7 +98,6 @@ public class LayerManager {
                 layerListChangeListener.onLayerRemove(layer);
             }
         }
-        mMapView.refresh();
     }
 
     /**
@@ -122,7 +117,6 @@ public class LayerManager {
         }
         mLayerList.removeAll(tmpLayerList);
         //默认莫一种类型的type level都是一样的 所以不进行排序
-        mMapView.refresh();
     }
 
     /**
@@ -169,6 +163,7 @@ public class LayerManager {
     public void clearLayer() {
         mLayerList.clear();
     }
+
 
 
 }

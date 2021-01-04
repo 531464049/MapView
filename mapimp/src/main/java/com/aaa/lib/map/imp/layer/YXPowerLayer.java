@@ -60,6 +60,13 @@ public class YXPowerLayer extends YXPointAroundAreaLayer {
         this.rotation = rotation;
     }
 
+    public void setRadius(float radius) {
+        area.setRadius(radius);
+    }
+    public float getRadius(){
+        return area.radius;
+    }
+
     public Bitmap getBitmap() {
         return markerBitmap;
     }
